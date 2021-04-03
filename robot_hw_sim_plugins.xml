@@ -1,0 +1,11 @@
+<library path="lib/libpanda_hw_gazebo">
+
+  <class
+    name="panda_hw_gazebo/PandaRobotHWSim"
+    type="panda_hw_gazebo::PandaRobotHWSim"
+    base_class_type="gazebo_ros_control::RobotHWSim">
+    <description>
+      Default robot simulation interface which constructs joint handles from an SDF/URDF, extended by franka_model_handle
+    </description>
+  </class>
+</library>

@@ -5,10 +5,10 @@
 #include <array>
 #include <string>
 
-#include <franka/model.h>
-#include <franka/robot_state.h>
+//#include <franka/model.h>
+//#include <franka/robot_state.h>
 #include <hardware_interface/internal/hardware_resource_manager.h>
-#include <dyn_model/franka_model.h>
+//#include <dyn_model/franka_model.h>
 
 
 namespace franka_hw {
@@ -27,8 +27,10 @@ class FrankaModelHandle {
    * @param[in] model A reference to the franka::Model instance wrapped by this handle.
    * @param[in] robot_state A reference to the current robot state.
    */
-  FrankaModelHandle(const std::string& name, franka::Model& model, franka::RobotState& robot_state)
-      : name_(name), model_(&model), robot_state_(&robot_state) {}
+  //FrankaModelHandle(const std::string& name, franka::Model& model, franka::RobotState& robot_state)
+  //    : name_(name), model_(&model), robot_state_(&robot_state) {}
+  FrankaModelHandle(const std::string& name)
+      : name_(name) {}
 
   /**
    * Gets the name of the model handle.
@@ -36,6 +38,8 @@ class FrankaModelHandle {
    * @return Name of the model handle.
    */
   std::string getName() const noexcept { return name_; }
+
+  void test() { std::cout << "test" << std::endl;  }
 
   /**
    * Calculates the 7x7 mass matrix from the current robot state. Unit: \f$[kg \times m^2]\f$.
@@ -47,11 +51,11 @@ class FrankaModelHandle {
   std::array<double, 49> getMass() const { 
 
     //get q 
-    std::array<double, 7> q;
+    //std::array<double, 7> q;
 
-     Eigen::Matrix7d mass_tmp = MassMatrix(q);
+     //Eigen::Matrix7d mass_tmp = MassMatrix(q);
      std::array<double, 49> mass;
-     Eigen::Map<Eigen::MatrixXd> (mass.data(),2,2) = mass_tmp;
+     //Eigen::Map<Eigen::MatrixXd> (mass.data(),2,2) = mass_tmp;
     return mass;
   }
 
@@ -77,10 +81,10 @@ class FrankaModelHandle {
       double total_mass,
       const std::array<double, 3>& F_x_Ctotal) const {  // NOLINT (readability-identifier-naming)
 
-     Eigen::Vector7d q_tmp(q);
-     Eigen::Matrix7d mass_tmp = MassMatrix(q_tmp);
+     //Eigen::Vector7d q_tmp(q);
+     //Eigen::Matrix7d mass_tmp = MassMatrix(q_tmp);
      std::array<double, 49> mass;
-     Eigen::Map<Eigen::MatrixXd> (mass.data(),2,2) = mass_tmp;
+     //Eigen::Map<Eigen::MatrixXd> (mass.data(),2,2) = mass_tmp;
     return mass;
   }
 
@@ -233,8 +237,8 @@ class FrankaModelHandle {
 
  private:
   std::string name_;
-  const franka::Model* model_;
-  const franka::RobotState* robot_state_;
+  //const franka::Model* model_;
+  //const franka::RobotState* robot_state_;
 };
 
 /**

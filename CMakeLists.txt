@@ -1,122 +1,64 @@
-cmake_minimum_required(VERSION 3.4)
-project(franka_sim_hw)
+cmake_minimum_required(VERSION 2.8.3)
+project(panda_hw_gazebo)
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
+# Load catkin and all dependencies required for this package
 find_package(catkin REQUIRED COMPONENTS
-  actionlib
-  controller_interface
-  combined_robot_hw
-  hardware_interface
-  joint_limits_interface
+  gazebo_dev
   roscpp
+  std_msgs
+  control_toolbox
+  controller_manager
+  hardware_interface
+  transmission_interface
   pluginlib
+  joint_limits_interface
   urdf
-  franka_msgs
-  message_generation
+  angles
+  gazebo_ros_control
 )
-
-find_package(Franka 0.7.0 REQUIRED)
 
 catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES franka_sim_hw franka_control_services
   CATKIN_DEPENDS
-    actionlib_msgs
-    actionlib
-    controller_interface
-    combined_robot_hw
-    hardware_interface
-    joint_limits_interface
     roscpp
+    std_msgs
+    controller_manager
+    control_toolbox
     pluginlib
+    hardware_interface
+    transmission_interface
+    joint_limits_interface
     urdf
-    franka_msgs
-  DEPENDS Franka
+    angles
+    gazebo_ros_control
+  INCLUDE_DIRS include
+  LIBRARIES ${PROJECT_NAME}_plugin ${PROJECT_NAME}
 )
 
-add_library(franka_sim_hw
-  src/MassMatrix.cpp
-
-  src/control_mode.cpp
-  src/franka_sim_hw.cpp
-  src/franka_combinable_hw.cpp
-  src/franka_combined_hw.cpp
-  src/resource_helpers.cpp
-  src/trigger_rate.cpp
+link_directories(
+  ${catkin_LIBRARY_DIRS}
 )
 
-add_dependencies(franka_sim_hw
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-)
-
-target_link_libraries(franka_sim_hw
-  ${Franka_LIBRARIES}
-  ${catkin_LIBRARIES}
-  franka_control_services
-)
-
-target_include_directories(franka_sim_hw SYSTEM PUBLIC
-  ${Franka_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
-)
-target_include_directories(franka_sim_hw PUBLIC
-  include
-)
-
-## franka_control_services
-add_library(franka_control_services
-  src/services.cpp
-)
-
-add_dependencies(franka_control_services
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-)
-
-target_link_libraries(franka_control_services
-  ${Franka_LIBRARIES}
-  ${catkin_LIBRARIES}
-)
-
-target_include_directories(franka_control_services SYSTEM PUBLIC
-  ${Franka_INCLUDE_DIRS}
+include_directories(include
+  ${Boost_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
 )
 
-target_include_directories(franka_control_services PUBLIC
-  include
-)
+## Libraries
+add_library(${PROJECT_NAME}_plugin src/panda_hw_gazebo_plugin.cpp)
+target_link_libraries(${PROJECT_NAME}_plugin ${catkin_LIBRARIES})
 
-#if(CATKIN_ENABLE_TESTING)
-#  add_subdirectory(test)
-#endif()
+add_library(${PROJECT_NAME} src/panda_hw_gazebo.cpp)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
-## Installation
-install(TARGETS franka_sim_hw franka_control_services
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+## Install
+install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 )
 
-## Tools
-include(${CMAKE_CURRENT_LIST_DIR}/../cmake/ClangTools.cmake OPTIONAL
-  RESULT_VARIABLE CLANG_TOOLS
+install(FILES robot_hw_sim_plugins.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
-if(CLANG_TOOLS)
-  file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-  file(GLOB_RECURSE HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
-  )
-  add_format_target(franka_sim_hw FILES ${SOURCES} ${HEADERS})
-  add_tidy_target(franka_sim_hw
-    FILES ${SOURCES}
-    DEPENDS franka_sim_hw
-  )
-endif()

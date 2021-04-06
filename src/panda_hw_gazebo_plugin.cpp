@@ -192,11 +192,6 @@ void GazeboRosControlPlugin::Load(gazebo::physics::ModelPtr parent, sdf::Element
         ("gazebo_ros_control",
           "gazebo_ros_control::RobotHWSim"));
 
-    /*robot_hw_sim_loader_.reset
-      (new pluginlib::ClassLoader<gazebo_ros_control::RobotHWSim>
-        ("panda_hw_gazebo",
-          "gazebo_ros_control::RobotHWSim"));  */    
-
     robot_hw_sim_ = robot_hw_sim_loader_->createInstance(robot_hw_sim_type_str_);
     urdf::Model urdf_model;
     const urdf::Model *const urdf_model_ptr = urdf_model.initString(urdf_string) ? &urdf_model : NULL;

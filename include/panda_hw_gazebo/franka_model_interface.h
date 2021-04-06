@@ -1,14 +1,22 @@
 // Copyright (c) 2017 Franka Emika GmbH
+// Copyright (c) 2021 Jozef Stefan Institute
+
+
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
+
+
 #pragma once
 
 #include <array>
 #include <string>
 
-//#include <franka/model.h>
+#include <franka/model.h>
 //#include <franka/robot_state.h>
 #include <hardware_interface/internal/hardware_resource_manager.h>
-//#include <dyn_model/franka_model.h>
+
+#include <kdl/frames.hpp>
+#include <kdl_parser/kdl_parser.hpp>
+#include <tf_conversions/tf_kdl.h>
 
 
 namespace franka_hw {
@@ -20,6 +28,7 @@ class FrankaModelHandle {
  public:
   FrankaModelHandle() = delete;
 
+
   /**
    * Creates an instance of a FrankaModelHandle.
    *
@@ -29,8 +38,18 @@ class FrankaModelHandle {
    */
   //FrankaModelHandle(const std::string& name, franka::Model& model, franka::RobotState& robot_state)
   //    : name_(name), model_(&model), robot_state_(&robot_state) {}
-  FrankaModelHandle(const std::string& name)
-      : name_(name) {}
+  FrankaModelHandle(const std::string& name,
+   const std::array<double, 42>& zeroJacobian,
+   //const std::array<double, 16>& pose,
+   const std::array<double, 7>&  gravity,
+   const std::array<double, 7>& coriolis,
+   const std::array<double, 49>& mass)  :
+   name_(name),
+   zeroJacobian_(&zeroJacobian),
+   //pose_(&pose),
+   gravity_(&gravity),
+   coriolis_(&coriolis),
+   mass_(&mass)   {}
 
   /**
    * Gets the name of the model handle.
@@ -39,54 +58,15 @@ class FrankaModelHandle {
    */
   std::string getName() const noexcept { return name_; }
 
-  void test() { std::cout << "test" << std::endl;  }
-
-  /**
+/**
    * Calculates the 7x7 mass matrix from the current robot state. Unit: \f$[kg \times m^2]\f$.
    *
    * @return Vectorized 7x7 mass matrix, column-major.
    *
    * @see franka::Model::mass
    */
-  std::array<double, 49> getMass() const { 
+  std::array<double, 49> getMass() const { return *mass_; }
 
-    //get q 
-    //std::array<double, 7> q;
-
-     //Eigen::Matrix7d mass_tmp = MassMatrix(q);
-     std::array<double, 49> mass;
-     //Eigen::Map<Eigen::MatrixXd> (mass.data(),2,2) = mass_tmp;
-    return mass;
-  }
-
-  /**
-   * Calculates the 7x7 mass matrix from a given robot state. Unit: \f$[kg \times m^2]\f$.
-   *
-   * @param[in] q Joint position. Unit: \f$[rad]\f$.
-   * @param[in] total_inertia Inertia of the attached total load including end effector, relative to
-   * center of mass, given as vectorized 3x3 column-major matrix. Unit: \f$[kg \times m^2]\f$.
-   * @param[in] total_mass Weight of the attached total load including end effector.
-   * Unit: \f$[kg]\f$.
-   * @param[in] F_x_Ctotal Translation from flange to center of mass of the attached total load
-   * including end effector.
-   * Unit: \f$[m]\f$.
-   *
-   * @return Vectorized 7x7 mass matrix, column-major.
-   *
-   * @see franka::Model::mass
-   */
-  std::array<double, 49> getMass(
-      const std::array<double, 7>& q,
-      const std::array<double, 9>& total_inertia,
-      double total_mass,
-      const std::array<double, 3>& F_x_Ctotal) const {  // NOLINT (readability-identifier-naming)
-
-     //Eigen::Vector7d q_tmp(q);
-     //Eigen::Matrix7d mass_tmp = MassMatrix(q_tmp);
-     std::array<double, 49> mass;
-     //Eigen::Map<Eigen::MatrixXd> (mass.data(),2,2) = mass_tmp;
-    return mass;
-  }
 
   /**
    * Calculates the Coriolis force vector (state-space equation) from the current robot state:
@@ -96,87 +76,21 @@ class FrankaModelHandle {
    *
    * @see franka::Model::coriolis
    */
-
-
-  /**
-   * Calculates the Coriolis force vector (state-space equation) from the given robot state:
-   * \f$ c= C \times dq\f$, in \f$[Nm]\f$.
-   *
-   * @param[in] q Joint position. Unit: \f$[rad]\f$.
-   * @param[in] dq Joint velocity. Unit: \f$[\frac{rad}{s}]\f$.
-   * @param[in] total_inertia Inertia of the attached total load including end effector, relative to
-   * center of mass, given as vectorized 3x3 column-major matrix. Unit: \f$[kg \times m^2]\f$.
-   * @param[in] total_mass Weight of the attached total load including end effector.
-   * Unit: \f$[kg]\f$.
-   * @param[in] F_x_Ctotal Translation from flange to center of mass of the attached total load
-   * including end effector.
-   * Unit: \f$[m]\f$.
-   *
-   * @return Coriolis force vector.
-   *
-   * @see franka::Model::coriolis
-   */
-
+  std::array<double, 7> getCoriolis() const { return *coriolis_; }
 
   /**
    * Calculates the gravity vector from the current robot state. Unit: \f$[Nm]\f$.
    *
-   * @param[in] gravity_earth Earth's gravity vector. Unit: \f$\frac{m}{s^2}\f$.
-   * Default to {0.0, 0.0, -9.81}.
-   *
    * @return Gravity vector.
    *
    * @see franka::Model::gravity
    */
+  std::array<double, 7> getGravity() const {
+    return *gravity_;
+  }
 
   /**
-   * Calculates the gravity vector from the given robot state. Unit: \f$[Nm]\f$.
-   *
-   * @param[in] q Joint position. Unit: \f$[rad]\f$.
-   * @param[in] total_mass Weight of the attached total load including end effector.
-   * Unit: \f$[kg]\f$.
-   * @param[in] F_x_Ctotal Translation from flange to center of mass of the attached total load
-   * including end effector.
-   * Unit: \f$[m]\f$.
-   * @param[in] gravity_earth Earth's gravity vector. Unit: \f$\frac{m}{s^2}\f$.
-   * Default to {0.0, 0.0, -9.81}.
-   *
-   * @return Gravity vector.
-   *
-   * @see franka::Model::gravity
-   */
-
-  /**
-   * Gets the 4x4 pose matrix for the given frame in base frame, calculated from the current
-   * robot state.
-   *
-   * The pose is represented as a 4x4 matrix in column-major format.
-   *
-   * @param[in] frame The desired frame.
-   *
-   * @return Vectorized 4x4 pose matrix, column-major.
-   *
-   * @see franka::Model::pose
-   */
-
-  /**
-   * Gets the 4x4 pose matrix for the given frame in base frame, calculated from the given
-   * robot state.
-   *
-   * The pose is represented as a 4x4 matrix in column-major format.
-   *
-   * @param[in] frame The desired frame.
-   * @param[in] q Joint position. Unit: \f$[rad]\f$.
-   * @param[in] F_T_EE End effector in flange frame.
-   * @param[in] EE_T_K Stiffness frame K in the end effector frame.
-   *
-   * @return Vectorized 4x4 pose matrix, column-major.
-   *
-   * @see franka::Model::pose
-   */
-
-  /**
-   * Gets the 6x7 Jacobian for the given frame, relative to that frame.
+   * Gets the 6x7 Jacobian for the given joint relative to the base frame.
    *
    * The Jacobian is represented as a 6x7 matrix in column-major format and calculated from
    * the current robot state.
@@ -185,60 +99,32 @@ class FrankaModelHandle {
    *
    * @return Vectorized 6x7 Jacobian, column-major.
    *
-   * @see franka::Model::bodyJacobian
+   * @see franka::Model::zeroJacobian
    */
+  std::array<double, 42> getZeroJacobian(const franka::Frame& frame) const {
+    return *zeroJacobian_;
+  }
 
-
-  /**
-   * Gets the 6x7 Jacobian for the given frame, relative to that frame.
-   *
-   * The Jacobian is represented as a 6x7 matrix in column-major format and calculated from
-   * the given robot state.
-   *
-   * @param[in] frame The desired frame.
-   * @param[in] q Joint position. Unit: \f$[rad]\f$.
-   * @param[in] F_T_EE End effector in flange frame.
-   * @param[in] EE_T_K Stiffness frame K in the end effector frame.
-   *
-   * @return Vectorized 6x7 Jacobian, column-major.
-   *
-   * @see franka::Model::bodyJacobian
+  /* Not implemented:
+  std::array<double, 7> getCoriolis(const std::array<double, 7>& q, const std::array<double, 7>& dq, const std::array<double, 9>& total_inertia, double total_mass, const std::array<double, 3>& F_x_Ctotal) const;
+  std::array<double, 7> getGravity(const std::array<double, 7>& q, double total_mass, const std::array<double, 3>& F_x_Ctotal,  const std::array<double, 3>& gravity_earth = {{0., 0., -9.81}});
+  std::array<double, 16> getPose(const franka::Frame& frame) const;
+  std::array<double, 16> getPose(const franka::Frame& frame, const std::array<double, 7>& q, const std::array<double, 16>& F_T_EE, const std::array<double, 16>& EE_T_K) const;
+  std::array<double, 42> getBodyJacobian(const franka::Frame& frame) const;
+  std::array<double, 42> getBodyJacobian(const franka::Frame& frame, const std::array<double, 7>& q, const std::array<double, 16>& F_T_EE, const std::array<double, 16>& EE_T_K);
+  std::array<double, 42> getZeroJacobian(const franka::Frame& frame, const std::array<double, 7>& q, const std::array<double, 16>& F_T_EE, const std::array<double, 16>& EE_T_K) const;
+  std::array<double, 49> getMass(const std::array<double, 7>& q, const std::array<double, 9>& total_inertia, double total_mass, const std::array<double, 3>& F_x_Ctotal) const;
   */
-
-  /**
-   * Gets the 6x7 Jacobian for the given joint relative to the base frame.
-   *
-   * The Jacobian is represented as a 6x7 matrix in column-major format and calculated from
-   * the current robot state.
-   *
-   * @param[in] frame The desired frame.
-   *
-   * @return Vectorized 6x7 Jacobian, column-major.
-   *
-   * @see franka::Model::zeroJacobian
-   */
-
-
-  /**
-   * Gets the 6x7 Jacobian for the given joint relative to the base frame.
-   *
-   * The Jacobian is represented as a 6x7 matrix in column-major format and calculated from
-   * the given robot state.
-   *
-   * @param[in] frame The desired frame.
-   * @param[in] q Joint position. Unit: \f$[rad]\f$.
-   * @param[in] F_T_EE End effector in flange frame.
-   * @param[in] EE_T_K Stiffness frame K in the end effector frame.
-   *
-   * @return Vectorized 6x7 Jacobian, column-major.
-   *
-   * @see franka::Model::zeroJacobian
-   */
 
  private:
   std::string name_;
-  //const franka::Model* model_;
   //const franka::RobotState* robot_state_;
+  const std::array<double, 42>* zeroJacobian_;
+  //const std::array<double, 16>* pose_;
+  const std::array<double, 7>*  gravity_;
+  const std::array<double, 7>* coriolis_;
+  const std::array<double, 49>* mass_;
+
 };
 
 /**

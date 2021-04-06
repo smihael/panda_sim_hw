@@ -1,19 +1,16 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>panda_hw_gazebo</name>
-  <version>2.5.20</version>
+  <version>0.0.1</version>
   <description>panda_hw_gazebo</description>
 
-  <maintainer email="jrivero@osrfoundation.org">Jose Luis Rivero</maintainer>
+  <maintainer email="mihael.simonic@ijs.si">Mihael Simonic</maintainer>
 
   <license>BSD</license>
+  <url type="bugtracker">https://github.com/smihael/panda_sim_hw/issues</url>
+  <url type="repository">https://github.com/smihael/panda_sim_hw/</url>
 
-  <url type="website">http://ros.org/wiki/panda_hw_gazebo</url>
-  <url type="bugtracker">https://github.com/ros-simulation/gazebo_ros_pkgs/issues</url>
-  <url type="repository">https://github.com/ros-simulation/gazebo_ros_pkgs</url>
-
-  <author>Jonathan Bohren</author>
-  <author>Dave Coleman</author>
+  <author>Mihael Simonic</author>
 
   <buildtool_depend>catkin</buildtool_depend>
 
@@ -30,6 +27,11 @@
   <depend>urdf</depend>
   <depend>angles</depend>
   <depend>gazebo_ros_control</depend>
+
+  <depend>orocos_kdl</depend>
+  <depend>kdl_parser</depend>
+  <depend>tf_conversions</depend>
+
   <export>
     <gazebo_ros_control plugin="${prefix}/robot_hw_sim_plugins.xml"/>
   </export>

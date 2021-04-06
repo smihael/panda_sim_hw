@@ -15,7 +15,14 @@ find_package(catkin REQUIRED COMPONENTS
   urdf
   angles
   gazebo_ros_control
+
+  kdl_parser
+  orocos_kdl
+  tf_conversions
 )
+
+find_package(Franka 0.7.0 REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 catkin_package(
   CATKIN_DEPENDS
@@ -30,6 +37,11 @@ catkin_package(
     urdf
     angles
     gazebo_ros_control
+
+    kdl_parser
+    tf_conversions
+    DEPENDS Franka
+
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}_plugin ${PROJECT_NAME}
 )
@@ -40,6 +52,8 @@ link_directories(
 
 include_directories(include
   ${Boost_INCLUDE_DIR}
+  ${Franka_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -47,8 +61,22 @@ include_directories(include
 add_library(${PROJECT_NAME}_plugin src/panda_hw_gazebo_plugin.cpp)
 target_link_libraries(${PROJECT_NAME}_plugin ${catkin_LIBRARIES})
 
-add_library(${PROJECT_NAME} src/panda_hw_gazebo.cpp)
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
+add_library(${PROJECT_NAME} 
+ src/panda_hw_gazebo.cpp
+ src/kdl_methods.cpp
+ #src/kinematics.cpp
+ #src/MassMatrix.cpp
+ #src/franka_model_handle_impl.cpp
+)
+target_link_libraries(${PROJECT_NAME} 
+ ${catkin_LIBRARIES} 
+ ${Franka_LIBRARIES}
+)
+
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
+  ${EIGEN3_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
+)
 
 ## Install
 install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}

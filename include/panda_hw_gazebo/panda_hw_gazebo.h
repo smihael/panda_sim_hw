@@ -75,102 +75,70 @@
 #include <kdl/jntarray.hpp>
 #include <kdl/tree.hpp>
 #include <urdf/model.h>
-#include "kdl/chainfksolver.hpp"
+#include <kdl/chainfksolver.hpp>
 #include <panda_hw_gazebo/kdl_methods.h>
-
 
 namespace panda_hw_gazebo
 {
 
-struct Kinematics
-{
-  KDL::Chain chain;
-  std::vector<std::string> joint_names;
-  
-};
+  struct Kinematics
+  {
+    KDL::Chain chain;
+    std::vector<std::string> joint_names;
+  };
 
-//class DefaultRobotHWSim : public gazebo_ros_control::RobotHWSim
-class PandaRobotHWSim : public gazebo_ros_control::DefaultRobotHWSim
-{
-public:
+  class PandaRobotHWSim : public gazebo_ros_control::DefaultRobotHWSim
+  {
+  public:
+    virtual bool initSim(
+        const std::string &robot_namespace,
+        ros::NodeHandle model_nh,
+        gazebo::physics::ModelPtr parent_model,
+        const urdf::Model *const urdf_model,
+        std::vector<transmission_interface::TransmissionInfo> transmissions);
 
-  virtual bool initSim(
-    const std::string& robot_namespace,
-    ros::NodeHandle model_nh,
-    gazebo::physics::ModelPtr parent_model,
-    const urdf::Model *const urdf_model,
-    std::vector<transmission_interface::TransmissionInfo> transmissions);
+    virtual void readSim(ros::Time time, ros::Duration period);
 
-  virtual void readSim(ros::Time time, ros::Duration period);
+  protected:
+    franka_hw::FrankaModelInterface franka_model_interface_;
+    franka_hw::FrankaStateInterface franka_state_interface_;
 
-protected:
-  franka_hw::FrankaModelInterface franka_model_interface_;
-  franka_hw::FrankaStateInterface franka_state_interface_;
+  private:
+    // states
+    franka::RobotState robot_state_;
+    std::array<double, 7> gravity_, coriolis_;
+    std::array<double, 49> mass_matrix_;
+    std::array<double, 42> jacobian_;
 
-private:
+    std::string root_name_, tip_name_, gravity_tip_name_;
+    urdf::Model robot_model_;
+    KDL::Tree tree_;
+    std::map<std::string, Kinematics> kinematic_chain_map_;
+    KDLMethods *kdl_;
 
-  // states
-  franka::RobotState robot_state_;
-  std::array<double, 7> gravity_, coriolis_;
-  std::array<double, 49> mass_matrix_;
-  std::array<double, 6> O_dP_EE_;
-  std::array<double, 42> O_Jac_EE_;
+    bool initKDL(const ros::NodeHandle &nh);
+    bool createKinematicChain(std::string tip_name);
 
+    //Method to get joint  positions, velocities, and efforts and add it to the corresponding KDL Joint Arrays
+    void updateRobotStateJoints(const Kinematics &kin, KDL::JntArray &jnt_pos, KDL::JntArray &jnt_vel, KDL::JntArray &jnt_eff);
 
-  std::string root_name_, tip_name_, gravity_tip_name_;
-  urdf::Model robot_model_;
-  KDL::Tree tree_;
-  std::map<std::string, double> acceleration_map_;
-  std::map<std::string, Kinematics> kinematic_chain_map_;
+    // Compute Jacobian and add it to Robot State
+    void updateRobotStateJacobian(const Kinematics &kin, const KDL::JntArray &jnt_pos, const KDL::JntArray &jnt_vel);
 
-  //realtime_tools::RealtimeBox< std::shared_ptr<const sensor_msgs::JointState> > joint_state_buffer_;
-  //realtime_tools::RealtimeBox<std::shared_ptr<const geometry_msgs::Wrench>> ft_msg_buffer_;
+    // Compute inertia, coriolis and gravity, and add to Robot State
+    void updateRobotStateDynamics(const Kinematics &kin, const KDL::JntArray &jnt_pos, const KDL::JntArray &jnt_vel);
 
-  ros::Subscriber joint_command_sub_;
-  ros::Subscriber joint_state_sub_;
-  ros::Subscriber ft_sensor_sub_;
+    // Method to publish the endpoint state message
+    void updateRobotStateEndpoint();
 
-  ros::Publisher joint_limits_pub_;
-  ros::Publisher endpoint_state_pub_;
-  ros::Publisher robot_state_publisher_;
-  long endpoint_state_seq_;
-  long gravity_torques_seq_;
+    /* Method to calculate the position FK for the required joint configuration in rad
+     * with the result stored in geometry_msgs::Pose
+     * @returns true if successful
+     */
+    bool computePositionFK(const Kinematics &kin, const KDL::JntArray &jnt_pos, geometry_msgs::Pose &result);
+  };
 
-  ros::Timer update_timer_;
-
-  KDLMethods* kdl_;
-
-  bool initKDL(const ros::NodeHandle& nh);
-  bool createKinematicChain(std::string tip_name);
-
-
-
-/* Method to break down a JointState message object into the corresponding
- * KDL position, velocity, and effort Joint Arrays
- */
-void updateRobotStateJoints(const Kinematics& kin, KDL::JntArray& jnt_pos, KDL::JntArray& jnt_vel, KDL::JntArray& jnt_eff);
-
-  /* Compute Jacobian and end effector velocity and add to Robot State message
- */
-void updateRobotStateJacAndVel(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel);
-
-/* Compute inertia, coriolis and gravity, and add to Robot State message
- */
-void updateRobotStateDynamics(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel);
-
-/* Method to publish the endpoint state message
- */
-void updateRobotStateEndpoint();
-
-/* Method to calculate the position FK for the required joint configuration in rad
- * with the result stored in geometry_msgs::Pose
- *  @returns true if successful
- */
-bool computePositionFK(const Kinematics& kin, const KDL::JntArray& jnt_pos, geometry_msgs::Pose& result);
-
-};
-
-typedef boost::shared_ptr<PandaRobotHWSim> PandaRobotHWSimPtr;
+  typedef boost::shared_ptr<PandaRobotHWSim> PandaRobotHWSimPtr;
 
 }
 

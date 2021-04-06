@@ -30,7 +30,7 @@ bool PandaRobotHWSim::initSim(
   gazebo_ros_control::DefaultRobotHWSim::initSim(robot_namespace,model_nh,parent_model,urdf_model,transmissions);
 
     //Register model handle & interface
-    franka_hw::FrankaModelHandle model_handle("panda_model", O_Jac_EE_, gravity_, coriolis_, mass_matrix_); // TODO arm id
+    franka_hw::FrankaModelHandle model_handle("panda_model", jacobian_, gravity_, coriolis_, mass_matrix_); // TODO arm id
     franka_model_interface_.registerHandle(model_handle);
     registerInterface(&franka_model_interface_);
     ROS_INFO("Registered model interface");
@@ -133,11 +133,11 @@ void PandaRobotHWSim::readSim(ros::Time time, ros::Duration period)
 
 
     auto num_jnts = kinematic_chain_map_[tip_name_].chain.getNrOfJoints();
-    KDL::JntArray jnt_pos(num_jnts), jnt_vel(num_jnts), jnt_eff(num_jnts), jnt_accelerations(num_jnts);
-    KDL::JntArray jnt_gravity_model(num_jnts), jnt_gravity_only(num_jnts), jnt_zero(num_jnts);
+    KDL::JntArray jnt_pos(num_jnts), jnt_vel(num_jnts), jnt_eff(num_jnts);
+    KDL::JntArray jnt_gravity_model(num_jnts);
 
     updateRobotStateJoints(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel, jnt_eff);
-    updateRobotStateJacAndVel(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
+    updateRobotStateJacobian(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
     updateRobotStateDynamics(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
 
 }
@@ -181,7 +181,7 @@ void PandaRobotHWSim::updateRobotStateJoints(const Kinematics& kin,
         Eigen::Matrix3d m = q.toRotationMatrix();
         Eigen::Vector3d t(pose.position.x, pose.position.y, pose.position.z);
 
-        Eigen::Matrix4d Trans; // Your Transformation Matrix
+        Eigen::Matrix4d Trans; 
         Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
         Trans.block<3,3>(0,0) = m;
         Trans.block<3,1>(0,3) = t;
@@ -190,8 +190,6 @@ void PandaRobotHWSim::updateRobotStateJoints(const Kinematics& kin,
 
         std::vector<double> vec(flattened_mat.data(), flattened_mat.data() + flattened_mat.size());
         std::copy_n(vec.begin(), 16, robot_state_.O_T_EE.begin());
-
-        //KDL::JntArrayVel jnt_array_vel(jnt_pos, jnt_vel);
 
       }
     }
@@ -203,7 +201,7 @@ void PandaRobotHWSim::updateRobotStateDynamics(const Kinematics& kin, const KDL:
 
     KDL::JntArray C(num_jnts); //coriolis matrix
     KDL::JntArray G(num_jnts); //gravity matrix
-    KDL::JntSpaceInertiaMatrix H(num_jnts); //inertiamatrix H=square matrix of size= number of joints
+    KDL::JntSpaceInertiaMatrix H(num_jnts); //inertia matrix 
     kdl_->JntToMass(jnt_pos,H);
     kdl_->JntToCoriolis(jnt_pos,jnt_vel,C);
     kdl_->JntToGravity(jnt_pos,G);
@@ -221,30 +219,19 @@ void PandaRobotHWSim::updateRobotStateDynamics(const Kinematics& kin, const KDL:
     }
 } 
 
-void PandaRobotHWSim::updateRobotStateJacAndVel(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)
+void PandaRobotHWSim::updateRobotStateJacobian(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)
 {
     KDL::Jacobian J;
     J.resize(kin.chain.getNrOfJoints());
     kdl_->JacobianJntToJac(jnt_pos, J);
 
     Eigen::Matrix<double, 6, 1> ee_vel = J.data * jnt_vel.data;
-
     Eigen::Map<Eigen::RowVectorXd> J_vec(J.data.data(), J.data.size());
 
-    for (size_t i = 0; i < robot_state_.cartesian_collision.size(); i++) {
-      O_dP_EE_[i] = ee_vel(i,0);
-    }
-    for (size_t i = 0; i < O_Jac_EE_.size(); i++) {
-      O_Jac_EE_[i] = J_vec(i);
+    for (size_t i = 0; i < jacobian_.size(); i++) {
+      jacobian_[i] = J_vec(i);
     }
 
-}
-
-void PandaRobotHWSim::updateRobotStateEndpoint()
-{
-
-   
-  
 }
 
 bool PandaRobotHWSim::computePositionFK(const Kinematics& kin,

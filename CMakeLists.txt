@@ -66,9 +66,7 @@ target_link_libraries(${PROJECT_NAME}_plugin ${catkin_LIBRARIES})
 add_library(${PROJECT_NAME} 
  src/panda_hw_gazebo.cpp
  src/kdl_methods.cpp
- #src/kinematics.cpp
- #src/MassMatrix.cpp
- #src/franka_model_handle_impl.cpp
+ src/MassMatrix.cpp
 )
 target_link_libraries(${PROJECT_NAME} 
  ${catkin_LIBRARIES} 

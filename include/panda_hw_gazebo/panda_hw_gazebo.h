@@ -82,6 +82,7 @@
 #include <urdf/model.h>
 #include <kdl/chainfksolver.hpp>
 #include <panda_hw_gazebo/kdl_methods.h>
+#include <panda_hw_gazebo/franka_model.h>
 
 namespace panda_hw_gazebo
 {

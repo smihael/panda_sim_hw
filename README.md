@@ -14,6 +14,7 @@ Note that, instead of the default gazebo_ros_control plugin (`gazebo_ros_control
 * Plugin structure: [gazebo_ros_control](https://github.com/ros-simulation/gazebo_ros_pkgs/tree/kinetic-devel/gazebo_ros_control) by osrfoundation
 * Franka [Model](https://github.com/frankaemika/franka_ros/blob/kinetic-devel/franka_hw/include/franka_hw/franka_model_interface.h) & [State](https://github.com/frankaemika/franka_ros/blob/kinetic-devel/franka_hw/include/franka_hw/franka_state_interface.h) Interface specification from [franka_ros](https://github.com/frankaemika/franka_ros/) by Franka Emika GmbH
 * [kdl_methods]((https://github.com/justagist/panda_simulator/blob/melodic-devel/panda_gazebo/src/kdl_methods.cpp)) from [panda_gazebo](https://github.com/justagist/panda_simulator/blob/kinetic-devel/panda_gazebo) by Saif Sidhik
+* [`FrankaEmikaPandaDynModel`](https://github.com/marcocognetti/FrankaEmikaPandaDynModel)
 
 ## Useful resources for further development
 

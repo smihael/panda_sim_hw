@@ -5,7 +5,6 @@
 #include <kdl_parser/kdl_parser.hpp>
 #include <tf_conversions/tf_kdl.h>
 
-
 namespace
 {
 
@@ -203,8 +202,8 @@ void PandaRobotHWSim::updateRobotStateDynamics(const Kinematics& kin, const KDL:
 
     KDL::JntArray C(num_jnts); //coriolis matrix
     KDL::JntArray G(num_jnts); //gravity matrix
-    KDL::JntSpaceInertiaMatrix H(num_jnts); //inertia matrix 
-    kdl_->JntToMass(jnt_pos,H);
+    //KDL::JntSpaceInertiaMatrix H(num_jnts); //inertia matrix 
+    //kdl_->JntToMass(jnt_pos,H); <- very resources hungry
     kdl_->JntToCoriolis(jnt_pos,jnt_vel,C);
     kdl_->JntToGravity(jnt_pos,G);
 
@@ -213,12 +212,16 @@ void PandaRobotHWSim::updateRobotStateDynamics(const Kinematics& kin, const KDL:
       gravity_[jnt_idx] = G(jnt_idx,0);
       coriolis_[jnt_idx] = C(jnt_idx,0);
     }
+    
+    /*Eigen::Matrix<double,7,1> q(robot_state_.q.data());
+    Eigen::Matrix7d mass_matrix = MassMatrix(q);
+    Eigen::Map<Eigen::Matrix7d>(mass_matrix_.data(),7,7) = mass_matrix;*/ 
 
-    Eigen::Map<Eigen::RowVectorXd> H_vec(H.data.data(), H.data.size());
+    /*Eigen::Map<Eigen::RowVectorXd> H_vec(H.data.data(), H.data.size());
     for (size_t i = 0; i < mass_matrix_.size(); i++)
     {
       mass_matrix_[i] = H_vec(i);
-    }
+    }*/
 } 
 
 void PandaRobotHWSim::updateRobotStateJacobian(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)

@@ -41,13 +41,15 @@ bool PandaRobotHWSim::initSim(
     registerInterface(&franka_state_interface_);
     ROS_INFO("Registered state interface");
 
-    /*  lists registered interfaces
-    auto names = getNames();
-    for (size_t i = 0; i < names.size(); i++)
-    {
-          std::cout << names[i] << std::endl;
-    } */
-
+    // State puiblisher
+   double publish_rate(500.0);
+   if (!model_nh.getParam("publish_rate", publish_rate)) {
+     ROS_INFO_STREAM("panda_hw_gazebo: publish_rate not found. Defaulting to "
+                    << publish_rate);
+   }
+  // Realtime publisher
+  rate_trigger_ = franka_hw::TriggerRate(publish_rate);
+  publisher_franka_states_.init(model_nh, "/franka_state_controller/franka_states", 1); // TODO use remap
 
   initKDL(model_nh);
 
@@ -139,7 +141,7 @@ void PandaRobotHWSim::readSim(ros::Time time, ros::Duration period)
     updateRobotStateJoints(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel, jnt_eff);
     updateRobotStateJacobian(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
     updateRobotStateDynamics(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
-
+    publishRobotStateMsg();
 }
 
 
@@ -245,6 +247,37 @@ bool PandaRobotHWSim::computePositionFK(const Kinematics& kin,
   }
   tf::poseKDLToMsg(p_out, result);
   return true;
+}
+
+void PandaRobotHWSim::publishRobotStateMsg() {
+  // void FrankaStateController::publishFrankaStates(const ros::Time& time) {
+
+  if (rate_trigger_() && publisher_franka_states_.trylock()) {
+
+    for (size_t i = 0; i < robot_state_.q.size(); i++) {
+      publisher_franka_states_.msg_.q[i] = robot_state_.q[i];
+      //publisher_franka_states_.msg_.q_d[i] = robot_state_.q_d[i];
+      publisher_franka_states_.msg_.dq[i] = robot_state_.dq[i];
+      //publisher_franka_states_.msg_.dq_d[i] = robot_state_.dq_d[i];
+      //publisher_franka_states_.msg_.ddq_d[i] = robot_state_.ddq_d[i];
+      publisher_franka_states_.msg_.tau_J[i] = robot_state_.tau_J[i];
+      //publisher_franka_states_.msg_.dtau_J[i] = robot_state_.dtau_J[i];
+      //publisher_franka_states_.msg_.tau_J_d[i] = robot_state_.tau_J_d[i];
+      //publisher_franka_states_.msg_.theta[i] = robot_state_.theta[i];
+      //publisher_franka_states_.msg_.dtheta[i] = robot_state_.dtheta[i];
+      //publisher_franka_states_.msg_.joint_collision[i] = robot_state_.joint_collision[i];
+      //publisher_franka_states_.msg_.joint_contact[i] = robot_state_.joint_contact[i];
+      //publisher_franka_states_.msg_.tau_ext_hat_filtered[i] = robot_state_.tau_ext_hat_filtered[i];
+    }
+
+    for (size_t i = 0; i < robot_state_.O_T_EE.size(); i++)
+    {
+      publisher_franka_states_.msg_.O_T_EE[i] = robot_state_.O_T_EE[i];
+    }
+    
+    publisher_franka_states_.unlockAndPublish();
+  }
+  
 }
 
 

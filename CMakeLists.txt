@@ -15,10 +15,11 @@ find_package(catkin REQUIRED COMPONENTS
   urdf
   angles
   gazebo_ros_control
-
   kdl_parser
   orocos_kdl
   tf_conversions
+  franka_hw
+  franka_msgs
 )
 
 find_package(Franka 0.7.0 REQUIRED)
@@ -37,9 +38,10 @@ catkin_package(
     urdf
     angles
     gazebo_ros_control
-
     kdl_parser
     tf_conversions
+    franka_hw
+    franka_msgs
     DEPENDS Franka
 
   INCLUDE_DIRS include

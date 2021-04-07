@@ -70,6 +70,11 @@
 // libfranka robotstate struct
 #include <franka/robot_state.h>
 
+// franka state publisher
+#include <franka_msgs/FrankaState.h>
+#include <realtime_tools/realtime_publisher.h>
+#include <franka_hw/trigger_rate.h>
+
 // KDL
 #include <Eigen/Geometry>
 #include <kdl/jntarray.hpp>
@@ -136,6 +141,14 @@ namespace panda_hw_gazebo
      * @returns true if successful
      */
     bool computePositionFK(const Kinematics &kin, const KDL::JntArray &jnt_pos, geometry_msgs::Pose &result);
+
+    // Publish robot state as franka message
+    void publishRobotStateMsg();
+    realtime_tools::RealtimePublisher<franka_msgs::FrankaState> publisher_franka_states_;
+    franka_hw::TriggerRate rate_trigger_{1.0};
+
+
+
   };
 
   typedef boost::shared_ptr<PandaRobotHWSim> PandaRobotHWSimPtr;

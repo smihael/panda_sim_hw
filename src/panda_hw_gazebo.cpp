@@ -5,6 +5,8 @@
 #include <kdl_parser/kdl_parser.hpp>
 #include <tf_conversions/tf_kdl.h>
 
+#include <thread>
+
 namespace
 {
 
@@ -41,14 +43,21 @@ bool PandaRobotHWSim::initSim(
     ROS_INFO("Registered state interface");
 
     // State puiblisher
-   double publish_rate(500.0);
+   double publish_rate(100.0);
    if (!model_nh.getParam("publish_rate", publish_rate)) {
      ROS_INFO_STREAM("panda_hw_gazebo: publish_rate not found. Defaulting to "
                     << publish_rate);
    }
+
   // Realtime publisher
   rate_trigger_ = franka_hw::TriggerRate(publish_rate);
   publisher_franka_states_.init(model_nh, "/franka_state_controller/franka_states", 1); // TODO use remap
+
+  // Turn off some resources heavy calculations
+  model_nh.getParam("mass_calculation_needed", mass_calculation_needed);
+  model_nh.getParam("coriolis_calculation_needed", coriolis_calculation_needed);
+  model_nh.getParam("gravity_calculation_needed", gravity_calculation_needed);
+  model_nh.getParam("robot_state_needed", robot_state_needed);
 
   initKDL(model_nh);
 
@@ -130,28 +139,25 @@ bool PandaRobotHWSim::createKinematicChain(std::string tip_name)
 void PandaRobotHWSim::readSim(ros::Time time, ros::Duration period)
 {
   gazebo_ros_control::DefaultRobotHWSim::readSim(time,period);
-  //sets: joint_position_, joint_velocity_, joint_effort_
 
-
-    auto num_jnts = kinematic_chain_map_[tip_name_].chain.getNrOfJoints();
+    num_jnts = kinematic_chain_map_[tip_name_].chain.getNrOfJoints();
     KDL::JntArray jnt_pos(num_jnts), jnt_vel(num_jnts), jnt_eff(num_jnts);
-    KDL::JntArray jnt_gravity_model(num_jnts);
 
-    updateRobotStateJoints(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel, jnt_eff);
-    updateRobotStateJacobian(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
-    updateRobotStateDynamics(kinematic_chain_map_[tip_name_], jnt_pos, jnt_vel);
-    publishRobotStateMsg();
+    updateRobotStateJoints(jnt_pos, jnt_vel, jnt_eff);
+
+    std::vector<std::thread> threads;
+    if (robot_state_needed) threads.push_back(std::thread(&PandaRobotHWSim::updateJacobian,this,jnt_pos, jnt_vel));
+    if (coriolis_calculation_needed) threads.push_back(std::thread(&PandaRobotHWSim::updateCoriolisVec,this,jnt_pos, jnt_vel));
+    if (gravity_calculation_needed) threads.push_back(std::thread(&PandaRobotHWSim::updateGravityVec,this,jnt_pos));
+    if (mass_calculation_needed) threads.push_back(std::thread(&PandaRobotHWSim::updateMassMatrixKDL,this,jnt_pos));
+    if (robot_state_needed) threads.push_back(std::thread(&PandaRobotHWSim::publishRobotStateMsg,this)); 
+    for (auto &th : threads) th.join();
+  
 }
 
 
-void PandaRobotHWSim::updateRobotStateJoints(const Kinematics& kin,
-                                             KDL::JntArray& jnt_pos, KDL::JntArray& jnt_vel, KDL::JntArray& jnt_eff)
+void PandaRobotHWSim::updateRobotStateJoints(KDL::JntArray& jnt_pos, KDL::JntArray& jnt_vel, KDL::JntArray& jnt_eff)
 {
-  auto num_jnts = kin.joint_names.size();
-
-  jnt_pos.resize(num_jnts);
-  jnt_vel.resize(num_jnts);
-  jnt_eff.resize(num_jnts);
 
   KDL::SetToZero(jnt_pos);
   KDL::SetToZero(jnt_vel);
@@ -196,38 +202,55 @@ void PandaRobotHWSim::updateRobotStateJoints(const Kinematics& kin,
     }
 }
 
-void PandaRobotHWSim::updateRobotStateDynamics(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)
+void PandaRobotHWSim::updateCoriolisVec(const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)
 {
-    auto num_jnts = kin.chain.getNrOfJoints();
-
-    KDL::JntArray C(num_jnts); //coriolis matrix
-    KDL::JntArray G(num_jnts); //gravity matrix
-    //KDL::JntSpaceInertiaMatrix H(num_jnts); //inertia matrix 
-    //kdl_->JntToMass(jnt_pos,H); <- very resources hungry
+    KDL::JntArray C(num_jnts);
     kdl_->JntToCoriolis(jnt_pos,jnt_vel,C);
+
+    for (size_t jnt_idx = 0; jnt_idx < num_jnts; jnt_idx++)
+    {
+      coriolis_[jnt_idx] = C(jnt_idx,0);
+    }
+} 
+
+void PandaRobotHWSim::updateGravityVec(const KDL::JntArray& jnt_pos)
+{
+    KDL::JntArray G(num_jnts); 
     kdl_->JntToGravity(jnt_pos,G);
 
     for (size_t jnt_idx = 0; jnt_idx < num_jnts; jnt_idx++)
     {
       gravity_[jnt_idx] = G(jnt_idx,0);
-      coriolis_[jnt_idx] = C(jnt_idx,0);
     }
-    
-    /*Eigen::Matrix<double,7,1> q(robot_state_.q.data());
-    Eigen::Matrix7d mass_matrix = MassMatrix(q);
-    Eigen::Map<Eigen::Matrix7d>(mass_matrix_.data(),7,7) = mass_matrix;*/ 
+} 
 
-    /*Eigen::Map<Eigen::RowVectorXd> H_vec(H.data.data(), H.data.size());
+// very resources hungry
+void PandaRobotHWSim::updateMassMatrixKDL(const KDL::JntArray& jnt_pos)
+{
+    KDL::JntSpaceInertiaMatrix H(num_jnts); 
+    kdl_->JntToMass(jnt_pos,H); 
+    Eigen::Map<Eigen::RowVectorXd> H_vec(H.data.data(), H.data.size());
     for (size_t i = 0; i < mass_matrix_.size(); i++)
     {
       mass_matrix_[i] = H_vec(i);
-    }*/
-} 
+    }
+}
 
-void PandaRobotHWSim::updateRobotStateJacobian(const Kinematics& kin, const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)
+// even slower
+void PandaRobotHWSim::updateMassMatrixModel()
+{
+    Eigen::Matrix<double,7,1> q(robot_state_.q.data());
+    Eigen::Matrix7d mass_matrix = MassMatrix(q);
+    Eigen::Map<Eigen::Matrix7d>(mass_matrix_.data(),7,7) = mass_matrix;
+}
+
+//TODO: check RBDL, pinocchio 
+
+
+void PandaRobotHWSim::updateJacobian(const KDL::JntArray& jnt_pos, const KDL::JntArray& jnt_vel)
 {
     KDL::Jacobian J;
-    J.resize(kin.chain.getNrOfJoints());
+    J.resize(num_jnts);
     kdl_->JacobianJntToJac(jnt_pos, J);
 
     Eigen::Matrix<double, 6, 1> ee_vel = J.data * jnt_vel.data;

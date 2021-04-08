@@ -122,17 +122,25 @@ namespace panda_hw_gazebo
     std::map<std::string, Kinematics> kinematic_chain_map_;
     KDLMethods *kdl_;
 
+    size_t num_jnts;
+
     bool initKDL(const ros::NodeHandle &nh);
     bool createKinematicChain(std::string tip_name);
 
     //Method to get joint  positions, velocities, and efforts and add it to the corresponding KDL Joint Arrays
-    void updateRobotStateJoints(const Kinematics &kin, KDL::JntArray &jnt_pos, KDL::JntArray &jnt_vel, KDL::JntArray &jnt_eff);
+    void updateRobotStateJoints(KDL::JntArray &jnt_pos, KDL::JntArray &jnt_vel, KDL::JntArray &jnt_eff);
 
     // Compute Jacobian and add it to Robot State
-    void updateRobotStateJacobian(const Kinematics &kin, const KDL::JntArray &jnt_pos, const KDL::JntArray &jnt_vel);
+    void updateJacobian(const KDL::JntArray &jnt_pos, const KDL::JntArray &jnt_vel);
 
-    // Compute inertia, coriolis and gravity, and add to Robot State
-    void updateRobotStateDynamics(const Kinematics &kin, const KDL::JntArray &jnt_pos, const KDL::JntArray &jnt_vel);
+    // Compute coriolis and gravity, and add to Robot State
+    void updateCoriolisVec(const KDL::JntArray &jnt_pos, const KDL::JntArray &jnt_vel);
+    void updateGravityVec(const KDL::JntArray &jnt_pos);
+
+    // Different methods for inertia calculation
+    void updateMassMatrixKDL(const KDL::JntArray& jnt_pos);
+    void updateMassMatrixModel();
+
 
     // Method to publish the endpoint state message
     void updateRobotStateEndpoint();
@@ -148,7 +156,10 @@ namespace panda_hw_gazebo
     realtime_tools::RealtimePublisher<franka_msgs::FrankaState> publisher_franka_states_;
     franka_hw::TriggerRate rate_trigger_{1.0};
 
-
+    bool mass_calculation_needed = true;
+    bool coriolis_calculation_needed = true;
+    bool gravity_calculation_needed = true;
+    bool robot_state_needed = true;
 
   };
 

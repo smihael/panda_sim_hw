@@ -1,3 +1,6 @@
+***DEPRECATED: This is no longer maintained. Use the official simulation stack provided by [Franka](https://frankaemika.github.io/docs/franka_ros.html#franka-gazebo).***
+
+
 # Gazebo ros_control interfaces for simulated Franka Emika Panda robot
 
 This is a ROS package for that allows to use most features of `franka_state_interface` and `franka_model_interface` with the [Gazebo](http://gazebosim.org/) simulator.
